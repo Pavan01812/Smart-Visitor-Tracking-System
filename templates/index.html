@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>VisitorTrack Pro | Secure Access</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = {darkMode: 'class', theme: {extend: {colors: {slate: {850:'#1e293b',900:'#0f172a',950:'#020617'}, blue:{500:'#007BFF'}, gold:{500:'#FFD700'}}}}} </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col" x-data="appData()">
+
+    <div x-show="!loggedIn" class="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-4" x-transition.opacity>
+        <div class="text-center mb-12">
+            <div class="inline-block bg-blue-600 p-4 rounded-2xl mb-4 shadow-lg shadow-blue-600/20">
+                <i data-lucide="camera" class="w-8 h-8 text-white"></i>
+            </div>
+            <h1 class="text-4xl font-bold mb-2">VisitorTrack Pro</h1>
+            <p class="text-slate-400">AI Surveillance Dashboard - Secure Login</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full">
+            <div class="relative h-64 group">
+                <button @click="showAdminPass = true" x-show="!showAdminPass" class="absolute inset-0 w-full h-full bg-red-600 hover:bg-red-700 transition-all p-8 rounded-2xl text-left overflow-hidden flex flex-col justify-end shadow-2xl shadow-red-900/20">
+                    <i data-lucide="shield" class="absolute top-8 left-8 w-12 h-12 text-red-200 opacity-80"></i>
+                    <h3 class="text-2xl font-bold">Administrator</h3>
+                    <p class="text-red-100 text-sm mt-1">Click to Login</p>
+                </button>
+                <div x-show="showAdminPass" class="absolute inset-0 w-full h-full bg-slate-800 border border-red-500/50 p-6 rounded-2xl flex flex-col justify-center transition-all" x-cloak>
+                    <h3 class="text-white font-bold mb-4 flex items-center gap-2"><i data-lucide="lock" class="w-4 h-4"></i> Admin Access</h3>
+                    <form @submit.prevent="verifyAdminLogin">
+                        <input type="password" x-model="adminPassword" placeholder="Password" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 mb-3 text-white focus:border-red-500 outline-none">
+                        <div class="flex gap-2"><button type="button" @click="showAdminPass = false" class="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg text-sm">Cancel</button><button type="submit" class="flex-1 bg-red-600 hover:bg-red-500 py-2 rounded-lg text-sm font-bold">Login</button></div>
+                    </form>
+                    <p x-show="loginError" class="text-red-400 text-xs mt-2 text-center animate-pulse">Incorrect Password</p>
+                </div>
+            </div>
+
+            <button @click="login('security')" class="bg-blue-600 hover:bg-blue-700 transition-all p-8 rounded-2xl text-left group relative overflow-hidden h-64 flex flex-col justify-end shadow-2xl shadow-blue-900/20">
+                <i data-lucide="eye" class="absolute top-8 left-8 w-12 h-12 text-blue-200 opacity-80 group-hover:scale-110 transition-transform"></i>
+                <h3 class="text-2xl font-bold">Security Officer</h3>
+                <p class="text-blue-100 text-sm mt-1">Monitor & respond</p>
+            </button>
+
+            <button @click="login('viewer')" class="bg-slate-700 hover:bg-slate-600 transition-all p-8 rounded-2xl text-left group relative overflow-hidden h-64 flex flex-col justify-end shadow-xl">
+                <i data-lucide="user" class="absolute top-8 left-8 w-12 h-12 text-slate-400 opacity-80 group-hover:scale-110 transition-transform"></i>
+                <h3 class="text-2xl font-bold text-white">Viewer</h3>
+                <p class="text-slate-300 text-sm mt-1">Read-only access</p>
+            </button>
+        </div>
+    </div>
+
+    <div x-show="loggedIn" class="flex-1 flex flex-col" x-cloak>
+        
+        <nav class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-3 font-bold text-xl">
+                    <div class="bg-blue-600 p-1.5 rounded"><i data-lucide="camera" class="h-5 w-5 text-white"></i></div> VisitorTrack Pro
+                </div>
+                <div class="flex space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+                    <button @click="setTab('live')" :class="tab === 'live' ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-white'" class="px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2"><i data-lucide="eye" class="w-4 h-4"></i> Live Feed</button>
+                    <template x-if="['admin', 'security'].includes(role)"><button @click="setTab('analytics')" :class="tab === 'analytics' ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-white'" class="px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2"><i data-lucide="bar-chart-3" class="w-4 h-4"></i> Analytics</button></template>
+                    <template x-if="role === 'admin'"><button @click="setTab('admin')" :class="tab === 'admin' ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-white'" class="px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2"><i data-lucide="settings" class="w-4 h-4"></i> Admin</button></template>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2 text-sm text-green-400 border border-green-900/30 bg-green-900/10 px-3 py-1 rounded-full"><span class="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span> Active</div>
+                    <button @click="logout" class="text-sm text-slate-400 hover:text-white">Log out</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="flex-1 max-w-7xl mx-auto w-full p-6">
+            
+            <div x-show="tab === 'live'" class="space-y-6" x-transition.opacity>
+                <div class="flex justify-end">
+                <button @click="isMuted = !isMuted" 
+                        class="px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 shadow-lg"
+                        :class="isMuted ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'">
+                    <i :data-lucide="isMuted ? 'volume-x' : 'volume-2'" class="w-5 h-5"></i>
+                    <span x-text="isMuted ? 'ALARM MUTED' : 'Sound On'"></span>
+                </button>
+            </div>
+                <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-black aspect-video group">
+                    <img src="{{ url_for('video_feed') }}" class="w-full h-full object-cover opacity-90">
+                    <div class="absolute top-4 left-4 bg-black/60 backdrop-blur px-3 py-1 rounded text-xs font-mono border border-white/10 text-slate-300">CAM-01 • MAIN ENTRANCE • <span x-text="currentTime"></span></div>
+                    <div class="absolute bottom-4 right-4 flex items-center gap-2 bg-slate-900/80 px-3 py-1 rounded-full border border-white/10"><div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div><span class="text-xs font-semibold text-white">REC</span></div>
+                    <div x-show="liveStats.alert" class="absolute inset-0 border-[6px] border-red-600 animate-pulse pointer-events-none z-20"></div>
+                    <div x-show="liveStats.alert" class="absolute bottom-12 left-0 right-0 mx-auto w-2/3 bg-red-600/90 backdrop-blur text-white text-center py-3 rounded-lg font-bold animate-bounce shadow-lg shadow-red-900/50 z-30">🚨 SECURITY ALERT: BANNED PERSON DETECTED</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="glass p-4 rounded-xl border-l-4 border-blue-500"><p class="text-slate-400 text-xs uppercase">Active Faces</p><h3 class="text-2xl font-bold text-white mt-1" x-text="liveStats.detected_count">0</h3></div>
+                    <div class="glass p-4 rounded-xl border-l-4 border-green-500"><p class="text-slate-400 text-xs uppercase">System Status</p><h3 class="text-xl font-bold text-green-400 mt-1">Monitoring</h3></div>
+                    <div class="glass p-4 rounded-xl border-l-4 border-purple-500"><p class="text-slate-400 text-xs uppercase">AI Model</p><h3 class="text-lg font-bold text-white mt-1">DeepFace v2</h3></div>
+                    <div class="glass p-4 rounded-xl border-l-4" :class="liveStats.alert ? 'border-red-500 bg-red-900/20' : 'border-slate-600'"><p class="text-slate-400 text-xs uppercase">Threat Level</p><h3 class="text-xl font-bold mt-1" :class="liveStats.alert ? 'text-red-500' : 'text-slate-400'" x-text="liveStats.alert ? 'CRITICAL' : 'LOW'">LOW</h3></div>
+                </div>
+            </div>
+
+            <div x-show="tab === 'analytics'" class="space-y-6" x-cloak x-transition.opacity>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="glass p-6 rounded-2xl"><p class="text-slate-400 mb-1">Visits Today</p><h2 class="text-4xl font-bold text-white" x-text="analytics.visits_today">0</h2></div>
+                    <div class="glass p-6 rounded-2xl"><p class="text-slate-400 mb-1">Unique Visitors</p><h2 class="text-4xl font-bold text-white" x-text="analytics.unique_visitors">0</h2></div>
+                    <div class="glass p-6 rounded-2xl bg-gradient-to-br from-slate-900 to-green-900/10"><p class="text-slate-400 mb-1">Current Vibe</p><h2 class="text-3xl font-bold text-green-400">Neutral 😐</h2></div>
+                </div>
+                <div class="glass p-6 rounded-2xl"><h3 class="text-lg font-semibold mb-6 flex items-center gap-2"><i data-lucide="bar-chart-3" class="text-blue-500"></i> Peak Visiting Hours</h3><div class="h-64 w-full"><canvas id="trafficChart"></canvas></div></div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="glass p-4 rounded-xl border-l-2 border-slate-700"><p class="text-slate-400 text-xs">Avg. Visit Duration</p><h3 class="text-2xl font-bold text-white mt-1" x-text="analytics.extra_kpis?.avg_duration || '0m'"></h3></div>
+                    <div class="glass p-4 rounded-xl border-l-2 border-slate-700"><p class="text-slate-400 text-xs">Staff Encounters</p><h3 class="text-2xl font-bold text-white mt-1" x-text="analytics.extra_kpis?.staff_encounters || 0"></h3></div>
+                    <div class="glass p-4 rounded-xl border-l-2 border-slate-700"><p class="text-slate-400 text-xs">Gold Members</p><h3 class="text-2xl font-bold text-white mt-1" x-text="analytics.extra_kpis?.gold_members || 0"></h3></div>
+                    <div class="glass p-4 rounded-xl border-l-2 border-slate-700"><p class="text-slate-400 text-xs">Security Alerts</p><h3 class="text-2xl font-bold text-white mt-1" x-text="analytics.extra_kpis?.security_alerts || 0"></h3></div>
+                </div>
+                <div class="glass p-6 rounded-2xl"><h3 class="text-lg font-semibold mb-4 text-white">Emotion Breakdown</h3><div class="grid grid-cols-2 md:grid-cols-5 gap-4"><template x-for="emo in analytics.emotions"><div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl text-center"><div class="text-4xl mb-3" x-text="emo.icon"></div><div class="text-slate-300 font-medium mb-1" x-text="emo.label"></div><div class="text-2xl font-bold text-white" x-text="emo.count"></div><div class="text-slate-500 text-xs mt-1" x-text="emo.percent"></div></div></template></div></div>
+            </div>
+
+            <div x-show="tab === 'admin'" class="space-y-6" x-cloak x-transition.opacity>
+                <div class="glass p-6 rounded-2xl grid md:grid-cols-2 gap-8">
+                    <div>
+                        <label class="flex justify-between text-sm text-slate-400 mb-2">
+                            <span>Cooldown Timer</span>
+                            <span class="text-blue-400 font-mono" x-text="formatCooldown(settings.cooldown)"></span>
+                        </label>
+                        <input type="range" min="10" max="1800" step="10" x-model="settings.cooldown" class="w-full h-2 bg-slate-700 rounded-lg appearance-none accent-blue-500 cursor-pointer">
+                        <div class="flex justify-between text-xs text-slate-600 mt-1">
+                            <span>10s</span>
+                            <span>30m</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="flex justify-between text-sm text-slate-400 mb-2"><span>Tolerance</span><span class="text-blue-400 font-mono" x-text="settings.tolerance"></span></label>
+                        <input type="range" min="0.3" max="0.8" step="0.05" x-model="settings.tolerance" class="w-full h-2 bg-slate-700 rounded-lg accent-blue-500 cursor-pointer">
+                    </div>
+                    <button @click="saveSettings" class="btn-primary col-span-2">Update Configuration</button>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="glass p-6 rounded-2xl"><h3 class="font-semibold mb-4">Enroll Staff</h3><form @submit.prevent="enrollStaff" class="space-y-4"><input type="text" x-model="staffName" placeholder="Name" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white" required><input type="file" @change="staffFile=$event.target.files[0]" class="w-full text-sm text-slate-500" required><button type="submit" class="w-full bg-slate-800 text-white py-2 rounded">Enroll</button></form></div>
+                    <div class="glass p-6 rounded-2xl"><h3 class="font-semibold mb-4">Search Visitor</h3><div class="border-2 border-dashed border-slate-700 rounded-xl p-8 text-center relative"><input type="file" @change="searchVisitor" class="absolute inset-0 opacity-0 cursor-pointer"><i data-lucide="image" class="mx-auto h-8 w-8 text-slate-500 mb-2"></i><p class="text-sm text-slate-400">Drop photo here</p></div><div x-show="searchResult" class="mt-4 p-3 rounded text-sm text-center border" :class="searchResult.includes('FOUND')?'border-green-500/30 text-green-400':'border-red-500/30 text-red-400'" x-text="searchResult"></div></div>
+                </div>
+                
+                <div class="glass rounded-2xl overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-slate-400 uppercase"><tr><th class="p-4">Name</th><th class="p-4">Badge</th><th class="p-4">Visits</th><th class="p-4">Actions</th></tr></thead><tbody class="divide-y divide-slate-800"><template x-for="p in people"><tr class="hover:bg-slate-800/50"><td class="p-4" x-text="p.name"></td><td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold" :class="p.is_banned?'bg-red-500/10 text-red-400':(p.badge=='GOLD'?'bg-yellow-500/10 text-yellow-400':'bg-blue-500/10 text-blue-400')" x-text="p.is_banned?'BANNED':p.badge"></span></td><td class="p-4" x-text="p.visits"></td><td class="p-4 flex gap-2"><button @click="apiPost('/toggle_ban/'+p.id)" class="text-yellow-600"><i data-lucide="ban" class="w-4 h-4"></i></button><button @click="apiPost('/delete_person/'+p.id)" class="text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr></template></tbody></table></div>
+            </div>
+        </main>
+    </div>
+
+    <audio id="siren" src="{{ url_for('static', filename='sounds/alert.mp3') }}"></audio>
+
+    <script>
+        lucide.createIcons();
+        function appData() {
+            return {
+                loggedIn: false, role: null, tab: 'live',
+                showAdminPass: false, adminPassword: '', loginError: false,
+                currentTime: new Date().toLocaleTimeString(),
+                liveStats: { detected_count: 0, alert: false },
+                analytics: { visits_today: 0, unique_visitors: 0, hourly_traffic: [], extra_kpis:{}, emotions:[] },
+                settings: { cooldown: 30, tolerance: 0.5 },
+                people: [], staffName: '', staffFile: null, searchResult: null, chart: null,
+                
+                isMuted: false, 
+
+                async verifyAdminLogin() { 
+                    const res = await fetch('/api/verify_admin', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ password: this.adminPassword })});
+                    if ((await res.json()).success) { this.login('admin'); this.showAdminPass=false; this.loginError=false; this.adminPassword=''; } else { this.loginError=true; }
+                },
+                login(r) { this.role=r; this.loggedIn=true; this.tab='live'; setTimeout(()=>lucide.createIcons(),100); },
+                logout() { this.role=null; this.loggedIn=false; this.showAdminPass=false; this.isMuted=false; },
+                setTab(t) { this.tab=t; if(t==='analytics') this.loadAnalytics(); if(t==='admin') this.loadPeople(); },
+                init() { 
+                    setInterval(() => { this.currentTime = new Date().toLocaleTimeString(); }, 1000);
+                    setInterval(() => { if(this.loggedIn) this.fetchStatus(); }, 1000);
+                    this.loadSettings();
+                },
+                formatCooldown(seconds) {
+                    if (seconds < 60) return seconds + 's';
+                    const mins = Math.floor(seconds / 60);
+                    return mins + 'm ' + (seconds % 60) + 's';
+                },
+
+                async fetchStatus() {
+                    const d = await (await fetch('/api/status')).json(); 
+                    this.liveStats = d;
+                    const aud = document.getElementById('siren'); 
+                    if (d.alert && !this.isMuted) { aud.play().catch(e=>{}); } else { aud.pause(); aud.currentTime = 0; }
+                },
+
+                async loadAnalytics() {
+                    const d = await (await fetch('/api/analytics')).json(); 
+                    this.analytics=d;
+                    if(this.chart) this.chart.destroy();
+                    const ctx=document.getElementById('trafficChart');
+                    if(ctx) this.chart=new Chart(ctx,{type:'bar',data:{labels:[...Array(24).keys()].map(h=>`${h}:00`),datasets:[{label:'Visits',data:d.hourly_traffic,backgroundColor:'#3b82f6',borderRadius:4}]},options:{maintainAspectRatio:false,scales:{y:{grid:{color:'#334155'}},x:{grid:{display:false}}},plugins:{legend:{display:false}}}});
+                },
+                async loadPeople() { this.people=await (await fetch('/api/people')).json(); setTimeout(()=>lucide.createIcons(),100); },
+                async loadSettings() { this.settings=await (await fetch('/api/settings')).json(); },
+                async saveSettings() { await this.apiPost('/api/settings', this.settings); alert('Saved!'); },
+                async enrollStaff() {
+                    const fd=new FormData(); fd.append('name',this.staffName); fd.append('photo',this.staffFile);
+                    await fetch('/enroll_staff',{method:'POST',body:fd}); this.staffName=''; this.staffFile=null; alert('Enrolled!');
+                },
+                async searchVisitor(e) {
+                    const fd=new FormData(); fd.append('photo',e.target.files[0]); this.searchResult="Scanning...";
+                    const res=await (await fetch('/api/search_visitor',{method:'POST',body:fd})).json();
+                    this.searchResult=res.found?`FOUND: ${res.person.name}`:`NO MATCH`;
+                },
+                async apiPost(u,b={}) { await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}); if(u.includes('ban')||u.includes('delete')) this.loadPeople(); }
+            }
+        }
+    </script>
+</body>
+</html>
